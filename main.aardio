@@ -1,0 +1,163 @@
+import fsys.table;
+import process.popen;
+import string.template;
+import web.rest.jsonLiteClient;
+
+//超30秒应用未退出将自杀
+thread.invoke( 
+	function(){	
+		import process;
+		sleep(30000);
+		::ExitProcess = ::Kernel32.api("ExitProcess", "int(int)");
+		ExitProcess(process.getId());
+	}
+)
+
+var ftbl = fsys.table("/config.table");
+//创建配置表文件
+/*
+ftbl.config = {};
+ftbl.config.sip = "";
+ftbl.config.srv = "";
+ftbl.config.is_block = 0;
+ftbl.config.allow_area = "";
+ftbl.system = {};
+ftbl.system.token = "";
+ftbl.system.wxtm = "";
+ftbl.system.ip = "";
+ftbl.system.tm = "";
+ftbl.blacklist = {};
+*/
+
+//企业微信应用相关密钥，也可放入到配置钟
+var corpid = "ww00xxxxxxxxxx";
+var agentid = "1000001";
+var secret = "BeobXu9-5RxxxxxxxZBBxxx-tyrxxxxxx";
+var srv = ftbl.config.srv;
+
+var restClient = web.rest.jsonLiteClient();
+
+//获取IP归属地,可替换为本地纯真数据库查询
+getipinfo = function(ip){ 
+	var result = restClient.get("http://ip.taobao.com/outGetIpInfo?ip="++ip++"&accessKey=alibaba-inc");
+	if(result.code == 0){
+		var data = result.data;
+		return data.country++data.region++data.city++" ("++data.isp++")";
+	}
+}
+
+gettoken = function(){ //获取企业微信token值
+	var curtm = tonumber(time.now());
+	var wxtm = ftbl.system.wxtm ? tonumber(ftbl.system.wxtm) : 0;
+	var token = ftbl.system.token;
+	if( #token && (curtm-wxtm)<6000 ){
+		return token; 
+	} else {
+		var jsonData = restClient.get("https://qyapi.weixin.qq.com/cgi-bin/gettoken",{corpid = corpid;corpsecret = secret;})
+		ftbl.system.token = jsonData.access_token;
+		ftbl.system.wxtm = curtm;
+		return jsonData.access_token;
+	}	
+}
+ 
+message = function(chatStr){ //发送应用消息
+	var token = gettoken();
+	var result = restClient.post("https://qyapi.weixin.qq.com/cgi-bin/message/send?access_token="++token,chatStr);
+	return result;
+}
+
+wxmsg = function(data,flag){//文本卡片消息
+	var cstr = /*
+		{
+   			"touser" : "@all",
+   			"msgtype" : "textcard",
+   			"agentid" : ${agentid},
+   			"textcard" : {
+            	"title" : "${title}",
+           		"description" : "<div></div> <div class=\"normal\">IP地址：${ip}</div><div class=\"highlight\"> IP归属：${ipbelong}</div><div class=\"highlight\"> 登录时间：${logintm}</div>",
+            	"url" : "http://imis.qq.com"
+   			}
+		}
+	*/
+
+	var cstr2 = /*
+		{
+   			"touser" : "@all",
+   			"msgtype" : "textcard",
+   			"agentid" : ${agentid},
+   			"textcard" : {
+            	"title" : "${title}",
+           		"description" : "<div></div> <div class=\"normal\">IP地址：${ip}</div><div> 登录时间：${logintm}</div><div class=\"highlight\"> 登出时间：${logouttm}</div><div class=\"highlight\"> 总用时：${difftm}</div>",
+            	"url" : "http://imis.qq.com"
+   			}
+		}
+	*/
+	
+	if(flag){
+		var temp = string.template(cstr)
+		jsonstr = temp.format(
+			agentid = agentid;
+			title = data.srv++" 服务器远程连接通知";
+			ip = data.ip;
+			ipbelong = data.ipbelong;
+			logintm = data.logintm;
+		)		
+	}else {
+		var temp = string.template(cstr2)
+		jsonstr = temp.format(
+			agentid = agentid;
+			title = data.srv++" 服务器远程断开通知";
+			ip = data.ip;
+			logintm = data.logintm;
+			logouttm = data.logouttm;
+			difftm = data.difftm++" 分钟";				
+		)
+	}
+
+	message(jsonstr);		
+}
+
+check_blacklist = function(ip_check,ip_belong){
+	var tab_area = string.split(ftbl.config.allow_area,'/');
+	var flags = true;
+	for(i=1;#tab_area;1){
+		if( string.find(ip_belong,tab_area[i]) ){
+			flags = false;
+			break;
+		}
+	}
+
+	if(flags){
+		table.push(ftbl.blacklist,ip_check);
+		var remote_ip = string.join(ftbl.blacklist,",");
+		process.popen.cmd('netsh advfirewall firewall set rule name=BlockIP new remoteip='++remote_ip);
+	}
+}
+
+var prcs = process.popen.cmd("netstat -n -p tcp");
+var str = prcs.peekTo(">");
+var ipstr = string.match(str,ftbl.config.sip++"\:3389\s+?(<\d+.>{3}\d+)\:");
+
+var data = {};
+var tm = time.now();
+if(ipstr){	//连接会话
+	ftbl.system.ip = ipstr;
+	tm.format = "%Y/%m/%d %H:%M:%S";
+	ftbl.system.tm = tostring(tm);
+
+	data.srv = srv;
+	data.ip = ipstr;
+	data.ipbelong = getipinfo(ipstr);	
+	data.logintm = tostring(tm);	
+	if( ftbl.config.is_block ){
+		check_blacklist(data.ip,data.ipbelong)
+	}
+	wxmsg(data,1);
+} else { //断开会话时	
+	data.srv = srv;
+	data.ip = ftbl.system.ip;
+	data.logintm = ftbl.system.tm;
+	data.logouttm = tostring(tm);
+	data.difftm	= tm.diffminute(time(data.logintm,"%Y/%m/%d %H:%M:%S"));
+	wxmsg(data,0);	
+}

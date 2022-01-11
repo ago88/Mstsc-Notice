@@ -1,0 +1,7 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<project ver="10" name="MSTSC-Notice" libEmbed="true" icon="res\mstsc.ico" ui="win" output="MSTSC-Notice.exe" CompanyName="zhuzb.com" FileDescription="MSTSC-Notice" LegalCopyright="Copyright (C) zhuzb.com 2021" ProductName="MSTSC-Notice" InternalName="MSTSC-Notice" FileVersion="0.0.0.04" ProductVersion="0.0.0.04" publishDir="/dist/" dstrip="false" local="false" ignored="false">
+	<file name="main.aardio" path="main.aardio" comment="启动程序代码"/>
+	<folder name="资源文件" path="res" embed="true" local="false" ignored="false">
+		<file name="mstsc.ico" path="res\mstsc.ico" comment="res\mstsc.ico"/>
+	</folder>
+</project>

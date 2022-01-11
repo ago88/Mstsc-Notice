@@ -1,0 +1,5 @@
+﻿{
+config={sip="192.168.1.101";srv="101 BOB";is_block=1;allow_area="内网IP/湖北黄冈/江苏苏州"};
+system={tm="2022/01/11 14:51:30";wxtm=1641883892;token="cae-kAJxm9fkPKB-KkcdCk6MHyiKUd6NcOFBYWWVMOwjodS_dLWFIwZJUXsv1sd1kUjRCkVVWENTN6A6b_uyC4RiHuUDD4mN4G39STAELAMcORwkEEF28OoBtpF-pW-Q1Vg2Ogrl3SP-KuX7Zygg5zERkfUTCUu8bScFxGBfWOkEkGwzeQ7Uqzl8gLu_YOBB4YHJNT-z8-SJJPJS7sVPcg";ip="180.100.230.110"};
+blacklist={[1]="195.54.167.183"}
+}
